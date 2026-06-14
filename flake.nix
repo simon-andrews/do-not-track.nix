@@ -23,5 +23,11 @@
         # The raw program dataset, exposed for inspection/reuse.
         lib.programs = import ./lib/collect.nix { lib = nixpkgs.lib; };
       };
+
+      perSystem =
+        { pkgs, ... }:
+        {
+          checks.eval = import ./checks/eval.nix { inherit pkgs; };
+        };
     };
 }
