@@ -34,6 +34,18 @@
             inherit pkgs;
             home-manager = inputs.home-manager;
           };
+
+          # `nix fmt`: the official treefmt+nixfmt wrapper, which already recurses
+          # the tree. (The editor formats separately via nixd's `formatting.command`.)
+          formatter = pkgs.nixfmt-tree;
+
+          # `nix develop` (and the tools the editor expects on PATH).
+          devShells.default = pkgs.mkShell {
+            packages = [
+              pkgs.nixd
+              pkgs.nixfmt
+            ];
+          };
         };
     };
 }

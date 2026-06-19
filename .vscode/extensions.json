@@ -1,0 +1,4 @@
+{
+  // Nix language support (LSP client + formatting), driven by nixd below.
+  "recommendations": ["jnoortheen.nix-ide"]
+}

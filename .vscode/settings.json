@@ -1,0 +1,28 @@
+{
+  // Use the nixd language server (provided by `nix develop`) via the Nix IDE extension.
+  "nix.enableLanguageServer": true,
+  "nix.serverPath": "nixd",
+  "nix.formatterPath": "nixfmt",
+  "nix.serverSettings": {
+    "nixd": {
+      // Evaluate against this flake's pinned nixpkgs so completion/hover match the lock.
+      "nixpkgs": {
+        "expr": "(builtins.getFlake (builtins.toString ./.)).inputs.nixpkgs.legacyPackages.${builtins.currentSystem}"
+      },
+      "formatting": {
+        "command": ["nixfmt"]
+      },
+      // Option completion/hover for both home-manager and this flake's `doNotTrack`
+      // options, by evaluating the module exactly as checks/eval.nix does.
+      "options": {
+        "home-manager": {
+          "expr": "(let f = builtins.getFlake (builtins.toString ./.); in f.inputs.home-manager.lib.homeManagerConfiguration { pkgs = f.inputs.nixpkgs.legacyPackages.${builtins.currentSystem}; modules = [ ./modules/home-manager.nix { home.username = \"dnt\"; home.homeDirectory = \"/home/dnt\"; home.stateVersion = \"24.11\"; } ]; }).options"
+        }
+      }
+    }
+  },
+  "[nix]": {
+    "editor.defaultFormatter": "jnoortheen.nix-ide",
+    "editor.formatOnSave": true
+  }
+}
