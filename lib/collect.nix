@@ -3,15 +3,13 @@
 { lib }:
 let
   dir = ../programs;
-  validate = import ./program.nix { inherit lib; };
   isNixFile = name: type: type == "regular" && lib.hasSuffix ".nix" name;
   nixFiles = lib.filterAttrs isNixFile (builtins.readDir dir);
-  load =
-    name:
-    let
-      file = dir + "/${name}";
-    in
+  load = name: {
     # id is the filename without its extension, e.g. homebrew.nix -> "homebrew".
-    { id = lib.removeSuffix ".nix" name; } // validate (toString file) (import file);
+    id = lib.removeSuffix ".nix" name;
+    file = toString (dir + "/${name}");
+    raw = import (dir + "/${name}");
+  };
 in
 lib.mapAttrsToList (name: _: load name) nixFiles

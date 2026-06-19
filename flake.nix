@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -20,14 +24,16 @@
         # Consumer entry point: imports = [ inputs.do-not-track.homeModules.default ];
         homeModules.default = ./modules/home-manager.nix;
 
-        # The raw program dataset, exposed for inspection/reuse.
-        lib.programs = import ./lib/collect.nix { lib = nixpkgs.lib; };
+        lib.programs = map (e: { inherit (e) id file; }) (import ./lib/collect.nix { lib = nixpkgs.lib; });
       };
 
       perSystem =
         { pkgs, ... }:
         {
-          checks.eval = import ./checks/eval.nix { inherit pkgs; };
+          checks.eval = import ./checks/eval.nix {
+            inherit pkgs;
+            home-manager = inputs.home-manager;
+          };
         };
     };
 }

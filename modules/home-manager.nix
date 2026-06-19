@@ -1,11 +1,46 @@
-# home-manager module: maps the platform-agnostic program dataset onto
-# home.sessionVariables.
-{ config, lib, ... }:
+# home-manager module: maps the program dataset onto home.sessionVariables (env
+# vars, always on) and, for programs that need it, onto real home-manager options
+# gated on a type-checked condition (settings + enable).
+{
+  config,
+  lib,
+  ...
+}:
 let
-  programs = import ../lib/collect.nix { inherit lib; };
+  entries = import ../lib/collect.nix { inherit lib; };
+  validate = import ../lib/program.nix { inherit lib; };
+  ids = map (e: e.id) entries;
+
+  # One submodule per program. `_file` attributes any option error (e.g. a settings
+  # entry referencing an option that doesn't exist) back to the program's source file.
+  programModule =
+    e:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    let
+      cfg = config.doNotTrack;
+      # Resolve the (possibly config-dependent) file, then validate the result.
+      data = validate e.file ((lib.toFunction e.raw) { inherit config lib pkgs; });
+    in
+    {
+      _file = e.file;
+      config = lib.mkIf (cfg.enable && cfg.programs.${e.id}.enable) (
+        lib.mkMerge [
+          { home.sessionVariables = data.env; }
+          (lib.mkIf data.enable data.settings)
+        ]
+      );
+    };
+
   cfg = config.doNotTrack;
 in
 {
+  imports = map programModule entries;
+
   options.doNotTrack = {
     enable = lib.mkEnableOption "telemetry and tracking opt-out environment variables" // {
       default = true;
@@ -35,11 +70,8 @@ in
   config = lib.mkIf cfg.enable {
     # Materialise a toggle entry for every known program (submodule default = enabled),
     # so cfg.programs.<id> always resolves.
-    doNotTrack.programs = lib.genAttrs (map (p: p.id) programs) (_: { });
+    doNotTrack.programs = lib.genAttrs ids (_: { });
 
-    home.sessionVariables = lib.mkMerge (
-      [ (lib.mkIf cfg.standard.enable { DO_NOT_TRACK = "1"; }) ]
-      ++ map (p: lib.mkIf cfg.programs.${p.id}.enable p.env) programs
-    );
+    home.sessionVariables = lib.mkIf cfg.standard.enable { DO_NOT_TRACK = "1"; };
   };
 }

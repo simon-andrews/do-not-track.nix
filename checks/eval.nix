@@ -1,41 +1,47 @@
-# Lightweight, dependency-free assertions for the home-manager module.
-# Uses lib.evalModules with a stub home.sessionVariables option so we can exercise
-# the module's logic without pulling in home-manager itself.
-{ pkgs }:
+# Assertions for the home-manager module, evaluated against real home-manager so
+# that settings referencing real options are type-checked. A failure throws at
+# evaluation time, failing `nix flake check`.
+{ pkgs, home-manager }:
 let
   lib = pkgs.lib;
 
-  sessionVars =
-    mods:
-    (lib.evalModules {
-      modules = mods ++ [
+  eval =
+    extra:
+    (home-manager.lib.homeManagerConfiguration {
+      inherit pkgs;
+      modules = [
         ../modules/home-manager.nix
-        (
-          { lib, ... }:
-          {
-            options.home.sessionVariables = lib.mkOption {
-              type = lib.types.attrsOf lib.types.str;
-              default = { };
-            };
-          }
-        )
+        {
+          home.username = "test";
+          home.homeDirectory = "/home/test";
+          home.stateVersion = "24.11";
+        }
+        extra
       ];
-    }).config.home.sessionVariables;
+    }).config;
 
-  default = sessionVars [ ];
-  noHomebrew = sessionVars [ { doNotTrack.programs.homebrew.enable = false; } ];
-  disabled = sessionVars [ { doNotTrack.enable = false; } ];
-  noStandard = sessionVars [ { doNotTrack.standard.enable = false; } ];
+  default = eval { };
+  noHomebrew = eval { doNotTrack.programs.homebrew.enable = false; };
+  disabled = eval { doNotTrack.enable = false; };
+  noStandard = eval { doNotTrack.standard.enable = false; };
+
+  vars = c: c.home.sessionVariables;
 
   check = name: cond: lib.optional (!cond) name;
 
   failures =
-    check "DO_NOT_TRACK set by default" ((default.DO_NOT_TRACK or null) == "1")
-    ++ check "homebrew var set by default" ((default.HOMEBREW_NO_ANALYTICS or null) == "1")
-    ++ check "per-program flag removes its var" (!(noHomebrew ? HOMEBREW_NO_ANALYTICS))
-    ++ check "per-program flag keeps other vars" ((noHomebrew.DOTNET_CLI_TELEMETRY_OPTOUT or null) == "1")
-    ++ check "master disable produces no vars" (disabled == { })
-    ++ check "standard flag drops DO_NOT_TRACK" (!(noStandard ? DO_NOT_TRACK));
+    check "DO_NOT_TRACK set by default" (((vars default).DO_NOT_TRACK or null) == "1")
+    ++ check "homebrew var set by default" (((vars default).HOMEBREW_NO_ANALYTICS or null) == "1")
+    ++ check "per-program flag removes its var" (!((vars noHomebrew) ? HOMEBREW_NO_ANALYTICS))
+    ++ check "per-program flag keeps other vars" (
+      ((vars noHomebrew).DOTNET_CLI_TELEMETRY_OPTOUT or null) == "1"
+    )
+    # Real home-manager sets its own session vars, so assert OUR keys are absent,
+    # not that the whole set is empty.
+    ++ check "master disable drops our vars" (
+      !((vars disabled) ? DO_NOT_TRACK) && !((vars disabled) ? HOMEBREW_NO_ANALYTICS)
+    )
+    ++ check "standard flag drops DO_NOT_TRACK" (!((vars noStandard) ? DO_NOT_TRACK));
 in
 if failures == [ ] then
   pkgs.runCommand "do-not-track-eval-tests" { } "touch $out"
