@@ -24,6 +24,8 @@ let
   noHomebrew = eval { doNotTrack.programs.homebrew.enable = false; };
   disabled = eval { doNotTrack.enable = false; };
   noStandard = eval { doNotTrack.standard.enable = false; };
+  goEnabled = eval { programs.go.enable = true; };
+  goDisabled = eval { programs.go.enable = false; };
 
   vars = c: c.home.sessionVariables;
 
@@ -41,7 +43,13 @@ let
     ++ check "master disable drops our vars" (
       !((vars disabled) ? DO_NOT_TRACK) && !((vars disabled) ? HOMEBREW_NO_ANALYTICS)
     )
-    ++ check "standard flag drops DO_NOT_TRACK" (!((vars noStandard) ? DO_NOT_TRACK));
+    ++ check "standard flag drops DO_NOT_TRACK" (!((vars noStandard) ? DO_NOT_TRACK))
+    ++ check "go telemetry off when go enabled" (
+      (goEnabled.programs.go.telemetry.mode or null) == "off"
+    )
+    ++ check "go telemetry untouched when go disabled" (
+      (goDisabled.programs.go.telemetry.mode or null) == null
+    );
 in
 if failures == [ ] then
   pkgs.runCommand "do-not-track-eval-tests" { } "touch $out"

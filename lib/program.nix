@@ -53,5 +53,7 @@ let
     config
     ;
 in
-# Force the whole entry so a malformed file fails on touch, not only when a field is read.
-lib.deepSeq config config
+# Returned lazily: the engine forces env/settings as it merges them, so type errors
+# still surface, but without eagerly forcing `enable` (which reads `config`)
+# while the config fixpoint is still being built -- that would be infinite recursion.
+config
